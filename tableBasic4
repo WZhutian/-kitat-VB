@@ -1,0 +1,647 @@
+'ver1.2.2'
+'==========全局变量=========='
+Public widthAll As Double '总宽度'
+Public fontWidth As Double '字符宽度'
+Public tableWidth As Double ' 表格宽度'
+Public wordApp As Object
+Public totalWidth As Double '当前行的已有宽度'
+Public cellNum As Integer '当前行已有的单元格数 1~n'
+Public rowNums As Integer '记录有多少行 1~n'
+Public nowAtRow As Integer '当前要写的行'
+Public nowAtCol As Integer '当前要写的列'
+Public signOfChange_col As Integer '第一个注释的列 1~n`'
+Public signOfChange_row As Integer '第一个注释的行 1~n'
+Public koreaWordTrans '注音字典'
+Public tableNumAll As Integer '总表格数1~n'
+Public tableNum As Integer '当前句子的表格起始0~n-1'
+Public cuter As Integer '遇到超大中文'
+Public psInfo As String '提示修改信息'
+'============================'
+ '设置剩余的行数，如果超小于4行则填满回车'
+Function setPageRest()
+  wordApp.Selection.EndKey Unit:=6
+  r = wordApp.Selection.Information(10) '当前行
+  w = 3
+  If r > 25 Then
+    For i = 0 To w
+      wordApp.ActiveDocument.Content.InsertAfter Text:=Chr(13) '末尾添加换行'
+      wordApp.Selection.EndKey Unit:=6
+      If wordApp.Selection.Information(10) = 1 Then
+        Exit For
+      End If
+    Next i
+    If i = w + 1 Then
+        For j = 0 To w
+            wordApp.Selection.HomeKey Unit:=5
+            wordApp.Selection.EndKey Unit:=5, Extend:=1
+            wordApp.Selection.Delete
+        Next j
+    End If
+  End If
+End Function
+
+Function setCellWidth(tn As Integer, row As Integer, col As Integer, width As Double)
+  Set Table = wordApp.ActiveDocument.Tables(tableNum + tn)
+  Table.Cell(row:=row, Column:=col).SetWidth ColumnWidth:=width, RulerStyle:=0
+End Function
+
+Function addChinese(rowNum As Integer, colNum As Integer, str As String)
+  With wordApp
+    Set Table = .ActiveDocument.Tables(tableNum + rowNum)
+    Table.Cell(row:=1, Column:=colNum).Select
+    Call wordApp.Selection.MoveDown(5, 3, 1)
+    If wordApp.Selection.Cells.Count < 4 Then
+      Call wordApp.Selection.MoveDown(5, 4 - wordApp.Selection.Cells.Count, 1)
+    End If
+    If wordApp.Selection.Cells.width > 9999 Then '选中了2*2'
+      Table.Cell(row:=1, Column:=colNum).Select
+       Call wordApp.Selection.MoveDown(5, 1, 1)
+       Call wordApp.Selection.MoveDown(5, 1, 1)
+       Call wordApp.Selection.MoveDown(5, 1, 1)
+       Call wordApp.Selection.MoveDown(5, 1, 1)
+    End If
+    wordApp.Selection.Cells.Merge
+    wordApp.Selection.Range.Font.Name = "宋体"
+    wordApp.Selection.Range.Font.Size = 14 '四号字体'
+    wordApp.Selection.Range.Font.Bold = True '加粗'
+    wordApp.Selection.Range = str
+    test = LenB(StrConv(str, 128))
+    Table.Cell(row:=1, Column:=colNum).SetWidth ColumnWidth:=Len(str) * 10 + 5, RulerStyle:=0
+    Table.Range.Cells.VerticalAlignment = 1    '垂直居中1'
+  End With
+End Function
+
+Function addKorea(rowNum As Integer, colNum As Integer, str_1 As String, str_2 As String)
+  With wordApp
+    Set Table = .ActiveDocument.Tables(tableNum + rowNum)
+    '取到音标'
+    korea_1 = Right(str_1, Len(str_1) - 1)
+    k_trans_1 = koreaWordTrans.Item(korea_1)
+    korea_2 = Right(str_2, Len(str_2) - 1)
+    k_trans_2 = koreaWordTrans.Item(korea_2)
+    '换算出长度'
+    test1 = LenB(StrConv(k_trans_1, 128))
+    test2 = LenB(StrConv(k_trans_2, 128))
+
+    per_1 = Len(korea_1) + LenB(StrConv(k_trans_1, 128)) / 2.5
+    per_2 = Len(korea_2) + LenB(StrConv(k_trans_2, 128)) / 2.5
+    If Left(str_1, 1) <> 8 Or Left(str_2, 1) <> 8 Then
+      per_1 = per_1 + 1
+      per_2 = per_2 + 1
+    End If
+    per = per_1
+    If per_2 > per_1 Then
+      per = per_2
+    End If
+    '先把4行都调整'
+    Table.Cell(row:=1, Column:=colNum).Select
+    Call wordApp.Selection.MoveDown(5, 3, 1)
+    If wordApp.Selection.Cells.Count < 4 Then
+      Call wordApp.Selection.MoveDown(5, 4 - wordApp.Selection.Cells.Count, 1)
+    End If
+    If wordApp.Selection.Cells.width > 9999 Then '选中了2*2'
+      Table.Cell(row:=1, Column:=colNum).Select
+       Call wordApp.Selection.MoveDown(5, 1, 1)
+       Call wordApp.Selection.MoveDown(5, 1, 1)
+       Call wordApp.Selection.MoveDown(5, 1, 1)
+       Call wordApp.Selection.MoveDown(5, 1, 1)
+    End If
+    wordApp.Selection.Cells.Merge
+    Call setCellWidth(rowNum, 1, colNum, per * 14)
+    Table.Cell(row:=1, Column:=colNum).Select
+    Call wordApp.Selection.Cells.Split(2, 1, True)
+    Table.Cell(row:=1, Column:=colNum).Select
+    Call wordApp.Selection.Cells.Split(2, 1, True)
+    Table.Cell(row:=3, Column:=colNum).Select
+    Call wordApp.Selection.Cells.Split(2, 1, True)
+    noPoint = 0
+    '合并单元格34'
+    Table.Cell(row:=3, Column:=colNum).Select
+    Call wordApp.Selection.MoveDown(5, 1, 1)
+    If wordApp.Selection.Cells.Count <> 2 Then
+      Call wordApp.Selection.MoveDown(5, 1, 1)
+    End If
+    wordApp.Selection.Cells.Merge
+    '画点2'
+    wordApp.Selection.Font.Name = "Haansoft Batang"
+    wordApp.Selection.Font.Size = 12 '小四号字体'
+    wordApp.Selection.Font.Bold = True '加粗'
+    If Left(str_2, 1) = 1 Then
+      wordApp.Selection.InsertAfter ChrW(&HFE11) '这里会自动调成宋体'
+    ElseIf Left(str_2, 1) = 2 Then
+      wordApp.Selection.InsertAfter "゛"
+    Else
+      If Left(str_1, 1) <> 8 Then
+        wordApp.Selection.InsertAfter "　"
+      Else
+        noPoint = 1
+      End If
+    End If
+    wordApp.Selection.Font.Name = "Haansoft Batang"
+    wordApp.Selection.InsertAfter korea_2
+    wordApp.Selection.InsertAfter k_trans_2
+    If noPoint = 0 Then
+      Table.Cell(row:=3, Column:=colNum).Select
+      wordApp.Selection.Characters(1).Font.Name = "宋体"
+    End If
+    For i = Len(korea_2) + 2 - noPoint To Len(korea_2) + 1 + Len(k_trans_2) - noPoint
+      Table.Cell(row:=3, Column:=colNum).Select
+      wordApp.Selection.Characters(i).Font.Name = "Times New Roman"
+      wordApp.Selection.Characters(i).Font.Size = 10.5
+      wordApp.Selection.Characters(i).Font.Bold = False
+    Next i
+
+    noPoint = 0
+    '合并单元格12'
+    Table.Cell(row:=1, Column:=colNum).Select
+    Call wordApp.Selection.MoveDown(5, 1, 1)
+    If wordApp.Selection.Cells.Count <> 2 Then
+      Call wordApp.Selection.MoveDown(5, 1, 1)
+    End If
+    wordApp.Selection.Cells.Merge
+    '画点1'
+    wordApp.Selection.Font.Name = "Haansoft Batang"
+    wordApp.Selection.Font.Size = 12 '小四号字体'
+    wordApp.Selection.Font.Bold = True '加粗'
+    If Left(str_1, 1) = 1 Then
+      wordApp.Selection.InsertAfter ChrW(&HFE11) '这里会自动调成宋体'
+    ElseIf Left(str_1, 1) = 2 Then
+      wordApp.Selection.InsertAfter "゛"
+    Else
+      If Left(str_2, 1) <> 8 Then
+        wordApp.Selection.InsertAfter "　"
+      Else
+        noPoint = 1
+      End If
+    End If
+    wordApp.Selection.Font.Name = "Haansoft Batang"
+    wordApp.Selection.InsertAfter korea_1
+    wordApp.Selection.InsertAfter k_trans_1
+    If noPoint = 0 Then
+      Table.Cell(row:=1, Column:=colNum).Select
+      wordApp.Selection.Characters(1).Font.Name = "宋体"
+    End If
+    For i = Len(korea_1) + 2 - noPoint To Len(korea_1) + 1 + Len(k_trans_1) - noPoint
+      Table.Cell(row:=1, Column:=colNum).Select
+      wordApp.Selection.Characters(i).Font.Name = "Times New Roman"
+      wordApp.Selection.Characters(i).Font.Size = 10.5
+      wordApp.Selection.Characters(i).Font.Bold = False
+    Next i
+
+    Table.Range.Cells.VerticalAlignment = 1    '垂直居中1'
+  End With
+End Function
+
+
+Function addSentence(rowNum As Integer, colNum As Integer, str As String, str2 As String, str3 As String, str4 As String)
+  With wordApp
+    Dim r As Integer
+    r = (signOfChange_row - 1) * 2 + (rowNum - signOfChange_row) * 4 + 1
+    Dim tmpStr As String
+    tmpStr = Max(str, str2)
+    tmpStr = Max(tmpStr, str3)
+    tmpStr = Max(tmpStr, str4)
+    Call setCellWidth(rowNum, 1, colNum, Len(tmpStr) * fontWidth)
+    Call setCellWidth(rowNum, 2, colNum, Len(tmpStr) * fontWidth)
+    Call setCellWidth(rowNum, 3, colNum, Len(tmpStr) * fontWidth)
+    Call setCellWidth(rowNum, 4, colNum, Len(tmpStr) * fontWidth)
+    Set Table = .ActiveDocument.Tables(tableNum + rowNum)
+    Table.Cell(row:=1, Column:=colNum).Select
+    wordApp.Selection.Font.Name = "Haansoft Batang"
+    wordApp.Selection.Range = str
+    For i = 1 To Len(str)
+      If Mid(str, i, 1) = ChrW(&HFE11) Or Mid(str, i, 1) = "゛" Then
+        Table.Cell(row:=1, Column:=colNum).Select '重新黑选'
+        wordApp.Selection.Characters(i).Font.Name = "宋体"
+      End If
+    Next i
+    Table.Cell(row:=2, Column:=colNum).Select
+    wordApp.Selection.Font.Name = "Haansoft Batang"
+    wordApp.Selection.Range = str2
+    Table.Cell(row:=3, Column:=colNum).Select
+    wordApp.Selection.Font.Name = "Haansoft Batang"
+    wordApp.Selection.Range = str3
+    Table.Cell(row:=4, Column:=colNum).Select
+    wordApp.Selection.Font.Name = "宋体"
+    wordApp.Selection.Range = str4
+  End With
+End Function
+
+Function addChineseSentence(str As String, colNumList() As Integer, _
+  sentenceList() As String)
+  With wordApp
+    Set Table = .ActiveDocument.Tables(tableNum + signOfChange_row)
+    If signOfChange_row = rowNums Then '如果和总共的行相同,直接填入'
+      Table.Cell(row:=4, Column:=signOfChange_col).Select
+      wordApp.Selection.Font.Name = "宋体"
+      wordApp.Selection.Range = str
+    Else  '如果和总共的行不相同,分割成两半'
+      lengthCut = 0
+      For i = 0 To colNumList(signOfChange_row) - signOfChange_col
+        lengthCut = lengthCut + Len(sentenceList(i)) + 1
+      Next i
+      Table.Cell(row:=4, Column:=signOfChange_col).Select
+      wordApp.Selection.Font.Name = "宋体"
+      wordApp.Selection.Range = Left(str, lengthCut)
+      If Len(Left(str, lengthCut)) < Len(str) Then '如果没有填完'
+        Set Table = .ActiveDocument.Tables(tableNum + signOfChange_row + 1)
+        Table.Cell(row:=4, Column:=1).Select
+        wordApp.Selection.Font.Name = "宋体"
+        wordApp.Selection.Range = Right(str, Len(str) - lengthCut)
+      End If
+    End If
+  End With
+End Function
+
+Function Max(a As String, b As String)
+  If Len(a) > Len(b) Then
+    Max = a
+  Else
+    Max = b
+  End If
+End Function
+
+Function addTable(charLength As Double, colNumList() As Integer)
+  totalWidth = totalWidth + charLength
+  '1不超标则继续'
+  If totalWidth < widthAll Then
+    cellNum = cellNum + 1
+    colNumList(rowNums) = cellNum
+  '2超标则生成表格并换行清零'
+  Else
+    Call setPageRest
+    contentEnd = wordApp.ActiveDocument.Content.End '文档末尾变量'
+    wordApp.ActiveDocument.Tables.Add Range:=wordApp.ActiveDocument.Range _
+      (contentEnd - 1, contentEnd), NumRows:=4, NumColumns:=cellNum '插入表格'
+    If cellNum <> 0 Then
+      tableNumAll = tableNumAll + 1
+      wordApp.ActiveDocument.Content.InsertAfter Text:=Chr(13) '末尾添加换行'
+      Set Table = wordApp.ActiveDocument.Tables(tableNumAll)
+      With Table
+        .TopPadding = 0
+        .BottomPadding = 0
+        .LeftPadding = 0.05
+        .RightPadding = 0
+        .Spacing = 0
+        .AllowPageBreaks = True
+        .AllowAutoFit = False
+      End With
+    End If
+    rowNums = rowNums + 1
+    cellNum = 1
+    totalWidth = charLength
+  End If
+End Function
+
+Function createTable(chineseList() As String, chineseNum As Integer, _
+  koreaList() As String, sentenceList() As String, sentenceList2() As String, sentenceList3() As String, _
+  sentenceList4() As String, sentenceNum As Integer, chineseSentence As String)
+    widthAll = 360 '总宽度'
+    fontWidth = 11 '每个文字的宽度'
+    tableWidth = 11 '每个表格的宽度'
+    nowTableRow = 1 '当前所在大表格数'
+    Dim nowCol As Integer
+    Dim krlen As String
+    nowCol = 1 '当前所在列数'
+    With wordApp
+'先做表格============================'
+      Dim colNumList(10) As Integer '记录每一行有多少单元格'
+      totalWidth = 0
+      cellNum = 0
+      rowNums = 1
+      signOfChange_col = 0
+      signOfChange_row = 0
+      '中文韩文部分======'
+      For i = 0 To chineseNum - 1
+        Call addTable(Len(chineseList(i)) * 10 + 5, colNumList)
+        korea_1 = Right(koreaList(i * 2), Len(koreaList(i * 2)) - 1)
+        k_trans_1 = koreaWordTrans.Item(korea_1)
+        korea_2 = Right(koreaList(i * 2 + 1), Len(koreaList(i * 2)) - 1)
+        k_trans_2 = koreaWordTrans.Item(korea_2)
+        '换算出长度'
+        test1 = LenB(StrConv(k_trans_1, 128))
+        test2 = LenB(StrConv(k_trans_2, 128))
+
+        per_1 = Len(korea_1) + LenB(StrConv(k_trans_1, 128)) / 2.5
+        per_2 = Len(korea_2) + LenB(StrConv(k_trans_2, 128)) / 2.5
+        If Left(str_1, 1) <> 8 Or Left(str_2, 1) <> 8 Then
+          per_1 = per_1 + 1
+          per_2 = per_2 + 1
+        End If
+        per = per_1
+        If per_2 > per_1 Then
+          per = per_2
+        End If
+        Call addTable(per * 14, colNumList) '补偿1个字节长度'
+      Next i
+      '分割符======'
+      Call addTable(15, colNumList)
+      '注释部分======'
+      For i = 0 To sentenceNum - 1
+        Dim tmpStr As String
+        tmpStr = Max(sentenceList(i), sentenceList2(i))
+        tmpStr = Max(tmpStr, sentenceList3(i))
+        tmpStr = Max(tmpStr, sentenceList4(i))
+        Call addTable(Len(tmpStr) * fontWidth, colNumList)
+        If i = 0 Then
+          signOfChange_row = rowNums '记录下开始的位置'
+          signOfChange_col = cellNum
+        End If
+      Next i
+      '绘制剩下的部分==='
+      Call setPageRest
+      contentEnd = wordApp.ActiveDocument.Content.End '文档末尾变量'
+      wordApp.ActiveDocument.Tables.Add Range:=wordApp.ActiveDocument.Range _
+        (contentEnd - 1, contentEnd), NumRows:=4, NumColumns:=cellNum '插入表格'
+      If cellNum <> 0 Then
+        tableNumAll = tableNumAll + 1
+        wordApp.ActiveDocument.Content.InsertAfter Text:=Chr(13) '末尾添加换行'
+        Set Table = wordApp.ActiveDocument.Tables(tableNumAll)
+        With Table
+          .TopPadding = 0
+          .BottomPadding = 0
+          .LeftPadding = 0.05
+          .RightPadding = 0
+          .Spacing = 0
+          .AllowPageBreaks = True
+          .AllowAutoFit = False
+        End With
+      End If
+      cellNum = 1
+'再填文字============================'
+      nowAtRow = 1
+      nowAtCol = 1
+      '中文韩文部分======'
+      For i = 0 To chineseNum - 1
+        Call addChinese(nowAtRow, nowAtCol, chineseList(i))
+        If nowAtCol = colNumList(nowAtRow) Then
+          nowAtRow = nowAtRow + 1
+          nowAtCol = 1
+        Else
+          nowAtCol = nowAtCol + 1
+        End If
+        Call addKorea(nowAtRow, nowAtCol, koreaList(i * 2), koreaList(i * 2 + 1))
+        If nowAtCol = colNumList(nowAtRow) Then
+          nowAtRow = nowAtRow + 1
+          nowAtCol = 1
+        Else
+          nowAtCol = nowAtCol + 1
+        End If
+      Next i
+      '分割符======'
+      Call addChinese(nowAtRow, nowAtCol, "○")
+      If nowAtCol = colNumList(nowAtRow) Then
+        nowAtRow = nowAtRow + 1
+        nowAtCol = 1
+      Else
+        nowAtCol = nowAtCol + 1
+      End If
+      '注释部分======'
+      For i = 0 To sentenceNum - 1
+        Call addSentence(nowAtRow, nowAtCol, sentenceList(i), sentenceList2(i), sentenceList3(i), sentenceList4(i))
+        If nowAtCol = colNumList(nowAtRow) Then
+          nowAtRow = nowAtRow + 1
+          nowAtCol = 1
+        Else
+          nowAtCol = nowAtCol + 1
+        End If
+      Next i
+'      Call addChineseSentence(chineseSentence,colNumList,sentenceList)'
+
+    End With
+End Function
+
+Function change16k()
+  With wordApp
+    With wordApp.Selection.PageSetup
+        .LineNumbering.Active = False
+        .Orientation = 0
+        .TopMargin = wordApp.CentimetersToPoints(2.54)
+        .BottomMargin = wordApp.CentimetersToPoints(2.54)
+        .LeftMargin = wordApp.CentimetersToPoints(3.17)
+        .RightMargin = wordApp.CentimetersToPoints(3.17)
+        .Gutter = wordApp.CentimetersToPoints(0)
+        .HeaderDistance = wordApp.CentimetersToPoints(1.5)
+        .FooterDistance = wordApp.CentimetersToPoints(1.75)
+        .PageWidth = wordApp.CentimetersToPoints(18.2)
+        '.PageWidth = wordApp.CentimetersToPoints(18.2)'
+        .PageHeight = wordApp.CentimetersToPoints(26)
+        .FirstPageTray = 0
+        .OtherPagesTray = 0
+        .SectionStart = 2
+        .OddAndEvenPagesHeaderFooter = False
+        .DifferentFirstPageHeaderFooter = False
+        .VerticalAlignment = 0
+        .SuppressEndnotes = False
+        .MirrorMargins = False
+        .TwoPagesOnOne = False
+        .BookFoldPrinting = False
+        .BookFoldRevPrinting = False
+        .BookFoldPrintingSheets = 1
+        .GutterPos = 0
+        .LinesPage = 40
+        .LayoutMode = 2
+    End With
+  End With
+End Function
+'判断文字类型,(11:中文,1:韩文音节,2:全角字符(，。？),3:半角字符(,.?),4:全角小括号(（）)'
+',5:加号(+),6,7:点(·:),8:全角中括号(【】),9:空格,10:回车)'
+Function judgeChar(c As String)
+  Dim unicode As Long
+  unicode = CLng("&H" & Hex(AscW(c)))
+  If c = "，" Or c = "。" Or c = "？" Or c = "！" Or c = "《" Or c = "》" Or c = "；" Then
+    judgeChar = 2
+  ElseIf c = "," Or c = "." Or c = "?" Or c = "!" Or c = "<" Or c = ">" Or c = ";" Then
+    judgeChar = 3
+  ElseIf c = "（" Or c = "）" Then
+    judgeChar = 4
+  ElseIf c = "+" Then
+    judgeChar = 5
+  ElseIf c = "·" Then
+    judgeChar = 6
+  ElseIf c = ":" Then
+    judgeChar = 7
+  ElseIf c = "【" Or c = "】" Then
+    judgeChar = 8
+  ElseIf c = " " Then
+    judgeChar = 9
+  ElseIf c = Chr(13) Then
+    judgeChar = 10
+  Else '通过unicode判断韩文字符(留给后续添加其他通过unicode判断字符的方案)'
+    If 4351 < unicode And unicode < 4608 Then  '朝鲜文字母'
+      judgeChar = 1
+    ElseIf 44031 < unicode And unicode < 55204 Then '韩文音节'
+      judgeChar = 1
+    ElseIf 57531 < unicode And unicode < 63736 Then  '专用区'
+      judgeChar = 1
+    ElseIf 12591 < unicode And unicode < 12688 Then  '朝鲜文兼容性字母'
+      judgeChar = 1
+    ElseIf 11903 < unicode And unicode < 12020 Then  'CJK偏旁部首增补'
+      judgeChar = 11
+    ElseIf 12031 < unicode And unicode < 12246 Then  '汉字字根'
+      judgeChar = 11
+    ElseIf 13311 < unicode And unicode < 19894 Then  'CJK统一汉字扩充'
+      judgeChar = 11
+    ElseIf 19967 < unicode And unicode < 40870 Then  'CJK统一汉字'
+      judgeChar = 11
+    ElseIf 55296 < unicode And unicode < 55551 Then  'CJK??'
+      judgeChar = 11
+    ElseIf 63743 < unicode And unicode < 64107 Then  'CJK兼容汉字'
+      judgeChar = 11
+    Else
+      If 128 < unicode Then
+        judgeChar = 11 '把不认识的字当成汉字 57067 57181'
+        If cuter = 0 Then
+          cuter = 1
+          psInfo = psInfo + "unicode编码:" + str(unicode) + ","
+        End If
+      End If
+    End If
+  End If
+End Function
+
+'获取中文字体 (当前位置已经是中文了,结束位置在最后一个中文)'
+Function getChinese(ByRef i As Integer, str As String)
+  Dim strCombine As String
+  Dim theChar As String
+  haveBrackets = 0 '记录括号数量'
+  haveChinese = 0 '记录中文字符'
+  For j = i To Len(str) - 1
+    theChar = Mid(str, j, 1)
+    charType = judgeChar(theChar) '判断字符类型'
+    If charType = 11 And haveChinese = 0 Then
+        strCombine = strCombine & theChar
+        haveChinese = 1
+    ElseIf charType = 4 Then
+      strCombine = strCombine & theChar
+      If haveBrackets = 0 Then
+        haveChinese = 0
+        haveBrackets = 1
+      Else
+        haveChinese = 1
+      End If
+    Else
+      i = i - 1
+      Exit For
+    End If
+    i = i + 1
+  Next j
+  getChinese = strCombine
+End Function
+
+'获取韩文字体(当前位置是点 或者 韩文,且是起始字符,结束为止为下一个字符)'
+Function getKorea(ByRef i As Integer, str As String)
+  Dim strCombine As String
+  Dim theChar As String
+  firstChar = 0 '判断第一个字符'
+  haveKorea = 0 '已经有一个韩文了,出现加号减一'
+  For j = i To Len(str) - 1
+    theChar = Mid(str, j, 1)
+    charType = judgeChar(theChar) '判断字符类型'
+    If charType = 6 And haveKorea = 0 Then '如果是点'
+      strCombine = strCombine & 1
+    ElseIf charType = 7 And haveKorea = 0 Then
+      strCombine = strCombine & 2
+    ElseIf charType = 1 And haveKorea = 0 Then '如果是韩文,且第一次拿到韩文字符(伪)'
+      If firstChar = 0 Then '如果首字符为空(韩文前没有点)'
+        strCombine = strCombine & 8
+      End If
+      haveKorea = 1
+      strCombine = strCombine & theChar
+    ElseIf charType = 5 And haveKorea = 1 Then '加号'
+      strCombine = strCombine & theChar
+      haveKorea = haveKorea - 1
+    Else
+      i = i - 1
+      Exit For
+    End If
+    firstChar = 1
+    i = i + 1
+  Next j
+  getKorea = strCombine
+End Function
+
+Sub Main()
+  Dim j As Integer
+  Dim sentence_text As String
+  Dim sentence_cn As String
+  Dim sentence_note As String
+  Dim chineseNum As Integer
+  Dim theChar As String
+  tableNumAll = 0
+  cuter = 0
+  Set koreaWordTrans = CreateObject("Scripting.Dictionary") '字典对象'
+  Application.ScreenUpdating = False '关闭屏幕刷新'
+  Set wordApp = CreateObject("word.application")     '建立一个word对象'
+  wordApp.Visible = False
+  With wordApp
+    .Documents.Add
+  End With
+  Call change16k
+  For i = 2 To 1650
+    koreaWordTrans.Add Replace(Cells(i, 9).Text, " ", ""), Replace(Cells(i, 10).Text, " ", "")
+  Next i
+  'For i = 2 To 18403'
+  'For i = 2 To 1449'
+  For i = 701 To 1449
+    sentence_text = Cells(i, 5).Text
+    sentence_cn = Cells(i, 6).Text
+    'sentence_note = Cells(i, 7).Text''1.2.1修改,这个已经被取代掉了'
+    '中文/韩文/短句数组'
+    ReDim chineseList(Len(sentence_cn)) As String
+    ReDim koreaList(Len(sentence_text)) As String
+    chineseNum = 0
+    koreaNum = 0
+    For j = 1 To Len(sentence_text) - 1
+    '获取韩文字符数组'
+      theChar = Mid(sentence_text, j, 1)
+      charType = judgeChar(theChar) '判断字符类型'
+      If charType = 6 Or charType = 7 Or charType = 1 Then
+        koreaList(koreaNum) = getKorea(j, sentence_text)
+        koreaNum = koreaNum + 1
+      End If
+    Next j
+    For j = 1 To Len(sentence_cn) - 1
+    '获取中文字符数组'
+      chineseList(chineseNum) = getChinese(j, sentence_cn)
+      chineseNum = chineseNum + 1
+    Next j
+    '获取注释数组,按空格分''1.2.1改为从列表中获取每个list的值'
+    Dim lastCol As Integer
+    lastCol = Cells(i, Columns.Count).End(1).Column - 10 '获取当前行的列数,减去基础行'
+    ReDim sentenceList(lastCol / 4) As String
+    ReDim sentenceList2(lastCol / 4) As String
+    ReDim sentenceList3(lastCol / 4) As String
+    ReDim sentenceList4(lastCol / 4) As String
+    For j = 0 To lastCol / 4 - 1
+      sentenceList(j) = Cells(i, 11 + j * 4).Text
+      sentenceList2(j) = Cells(i, 12 + j * 4).Text
+      sentenceList3(j) = Cells(i, 13 + j * 4).Text
+      sentenceList4(j) = Cells(i, 14 + j * 4).Text
+    Next j
+    '中文句子去掉最后一位'
+    sentence_cn = Left(sentence_cn, Len(sentence_cn) - 1)
+    tableNum = tableNumAll '设置为当前起始表格索引'
+    For j = 0 To Len(sentence_cn) - 1
+      Call judgeChar(Mid(sentence_cn, j + 1, 1))
+    Next j
+    On Error GoTo error1
+    Call createTable(chineseList, chineseNum - cuter, koreaList, sentenceList, sentenceList2, sentenceList3, sentenceList4, UBound(sentenceList), sentence_cn)
+    If cuter = 1 Then
+      psInfo = psInfo + "位置:" + str(i) + ";"
+    End If
+    cuter = 0
+  Next i
+    wordApp.ActiveDocument.Content.InsertAfter Text:=psInfo  '末尾添加修改信息'
+    wordApp.ActiveDocument.SaveAs "d:\MyWord2.doc" '保存最后生成的word文档'
+    wordApp.Documents.Close
+    wordApp.Quit
+    MsgBox Time
+error1:
+  Debug.Print i
+  Resume Next
+End Sub
+
+
+
+
